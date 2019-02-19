@@ -1,0 +1,1818 @@
+swagger: '2.0'
+info:
+  version: 1.0.0
+  title: User Service API
+  contact:
+    name: Linksys Engineering Development
+    email: linksys-cloud@belkin.com
+    url: 'http://www.linksys.com'
+  license:
+    name: MIT
+    url: 'http://opensource.org/licenses/MIT'
+host: 'localhost:8080'
+basePath: /user-service/rest
+tags:
+  - name: accounts
+    description: Operations on Accounts
+  - name: sessions
+    description: Operations on session
+  - name: verifications
+    description: Operations for verification
+  - name: clients
+    description: Get info on clients
+  - name: ApiMethodAuthorizationCheck
+    description: Checks Authorization for the client
+schemes:
+  - https
+consumes:
+  - application/xml
+  - application/json
+produces:
+  - application/xml
+  - application/json
+security:
+  - LinksysUserAuth: []
+paths:
+  /accounts/u:
+    post:
+      tags:
+        - accounts
+      summary: Create an account(without captcha)
+      description: |-
+
+        It creates an account with the specified username and sends out an email to the user to verify the account creation. The initial status of the newly created account is PENDING. The status is changed to ACTIVE when the user verifies account creation by clicking the link embedded in the email. Only an ACTIVE account can log-in using the Create a session (Log-in) API.
+        *   It returns an error if the honey pot field ("gender") is sent by the client. This field is not supposed to be filled in and set up to forbid automated systems (robots) accessing the API.
+        *  Initial status of Account will be ACTIVE, if the purpose is IP_CAMERA_SETUP.If the account is not verified with in 24 hours the status of the account will be changed to PENDING.
+          
+        * Creating an account with purpose CLOUD_ACCT_SETUP will activate the account right away and will be set to PENDING state, if the account is not verified in 48 hours from the time of account creation .
+        * As the client do not have control on the locale information all the time (Accept-language header value), the service doesn't return an error response if the locale information is invalid. Instead, the following rules will be applied to determine the user's locale.
+
+          Valid language code and country code in the request- User locale preference will be set as is.
+          Invalid language code in the request - Locale will be set to default locale (en_US)
+          Valid Language code and Invalid Country code in the request- Locale will be set to langauge code (Ignores country code from the request, Example - en_ZZ in the request will be considered as "en").
+
+
+        * Elements/fields to be included in the request body-
+        * username - The unique email address of the account. Required ? Yes
+        * password - The password of the account. Required ? Yes
+        * firstName , lastName  -first and last names of user that the account belongs to. Required ? Yes.
+        * middleName - middle name of the user that the account belongs to. Required ? Yes
+        * gender - Gender of the user. Required ? No.
+        * alias -The alias (screen name) of the account. Required ? No
+        * preferences.locale - The locale preference for the account  . Required ? No
+        * preferences.locale.language - One of the ISO 639 language codes .  Required ? Yes if <locale> element is included
+        * preferences.locale.country -  One of the ISO_3166-1_alpha-2 country codes . Required ? No
+        * preferences.notification.type  -  Type of notification that user is interested in (PUSH/EMAIL/SMS) . Required ? Yes if <locale> element is included
+        * preferences.notification.value - Value for the notification type . Required ? No
+        * preferences.newsletterOptIn - The newsletter opt-in (true/false) preference for the account . Required ? No
+        * Example Request Body(JSON)- 
+
+
+                  {
+                    "account": {
+                      "username": "amritjaintest1@gmail.com",
+                      "password": "testpwd3",
+                      "firstName": "Amrit",
+                      "lastName": "Jain",
+                      "middleName": "L",
+                      "alias": "amritj",
+                      "preferences": {
+                        "locale": {
+                          "language": "en",
+                          "country": "US"
+                        },
+                        "newsletterOptIn": "true"
+                      }
+                    }
+                  }
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: client-type-id-goes-here
+          required: true
+          type: string
+        - in: query
+          name: purpose
+          description: |-
+            * represents the initial purpose of creating the account.default is ROUTER_SETUP
+            * Other values are - IP_CAMERA_SETUP, ROUTER_SETUP, DEV_COMPANY_SETUP, DEV_COMPANY_WEMO_SDK_SETUP, CLOUD_ACCT_SETUP, CLOUD_VELOP_ACCT_SETUP 
+          required: false
+          type: string
+        - in: body
+          name: Account
+          description: 'Account object includes   username, password, firstname, lastname, middlename, alias, preferences(locale, notification , newsletterOptIn)'
+          required: true
+          schema:
+            $ref: '#/definitions/Account'
+      responses:
+        '200':
+          description: |-
+
+            * Account object with username and accountId is returned as response.
+            * Sample response body (Json)
+                     {
+                        "account": {
+                          "accountId": "AA8F9FD9-532D-4D59-B397-5D94CEC6A868",
+                          "username": "amritjaintest1@gmail.com"
+                        }
+                      }
+          schema:
+            $ref: '#/definitions/Account'
+        '403':
+          description: MISSING_PARAMETER  - Invalid Account information .
+        '409':
+          description: ACCOUNT_ALREADY_EXISTS - An account with the specified username already exists.
+  '/accounts/{username}':
+    get:
+      tags:
+        - accounts
+      summary: Get an account
+      description: |-
+
+        Gets (aka reads or retrieves) a specific account.
+        * The <username> is a value that uniquely identifies an account.
+        * To get the account of the currently logged-in user, the <username> can be replaced by self keyword in the URL .
+        * Currently this API call only supports self keyword. Specifying any other username in the URL will return ACCESS_DENIED error.
+        * The body of this request should be empty. If it is non-empty, the body will be ignored.
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: client-type-id-goes-here
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          description: LinksysUserAuth session_token="session-token-goes-here"
+          required: true
+          type: string
+        - in: path
+          name: username
+          description: Value of this path variable should be  Self .
+          required: true
+          type: string
+      responses:
+        '200':
+          description: |-
+            *  Account object with accountId, username,firstname,lastname,middlename and alias are returned retrieved .
+            * If the value of alias field is empty (in the backend database) for the account being returned, this API call returns the "firstName followed by lastName initial" as the value of alias field. Returns the actual value of alias field otherwise.
+            * Sample response body (JSON ) - 
+
+
+
+                        {
+                          "account": {
+                            "accountId": "AA8F9FD9-532D-4D59-B397-5D94CEC6A868",
+                            "username": "amritjaintest1@gmail.com",
+                            "firstName": "Amrit",
+                            "lastName": "Jain",
+                            "middleName": "L",
+                            "alias": "amritj"
+                          }
+                        }
+          schema:
+            $ref: '#/definitions/Account'
+        '403':
+          description: Access Denied. If value of the path variable "username" is other than Self.
+    put:
+      tags:
+        - accounts
+      summary: Update an account
+      description: |-
+
+        * Updates a specific account.
+        * We do not allow changing the username of an account
+        * This API call must not allow updating an account's password. The client should use Change password for an account API call to update an account's password.
+        * Elements/fields that can be included in the request body-
+        * firstName - The new first name of the user that the account belongs to.  Requied ? No
+        * lastName  - The new last name of the user that the account belongs to.  Requied ? No
+        * middleName - The new middle name of the user that the account belongs to . Requied ? No
+        * alias - The alias (screen name) of the account.  Requied ? No
+        * Example request body ( json) -
+
+                  {
+                    "account": {
+                      "firstName": "Amrit",
+                      "lastName": "Jain",
+                      "middleName": "L",
+                      "alias": "amritj"
+                    }
+                  }
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: client-type-id-goes-here
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          description: LinksysUserAuth session_token="session-token-goes-here"
+          required: true
+          type: string
+        - in: path
+          name: username
+          description: Value of this path variable should be  "Self" .
+          required: true
+          type: string
+        - in: body
+          name: Account
+          description: 'Account object includes  firstname, lastname, middlename, alias'
+          required: true
+          schema:
+            $ref: '#/definitions/Account'
+      responses:
+        '200':
+          description: |-
+            *  If the value of alias field is empty (in the backend database) for the account being returned, this API call returns the "firstName followed by lastName initial" as the value of alias field. Returns the actual value of alias field otherwise.
+
+            * Sample response body (JSON) 
+
+
+                       {
+                          "account": {
+                            "accountId": "AA8F9FD9-532D-4D59-B397-5D94CEC6A868",
+                            "username": "amritjaintest1@gmail.com",
+                            "firstName": "Amrit",
+                            "lastName": "Jain",
+                            "middleName": "L",
+                            "alias": "amritj"
+                          }
+                        }
+          schema:
+            $ref: '#/definitions/Account'
+        '403':
+          description: Access Denied. If value of the path variable "username" is other than "Self".
+  '/accounts/{username}/emailaddress':
+    get:
+      tags:
+        - accounts
+      summary: Get email address of an account
+      description: |-
+
+        * Gets (aka reads or retrieves) the email address of the specified account.
+        * The <username> is a value that uniquely identifies an account.
+        * To get the account of the currently logged-in user, the <username> can be replaced by self keyword in the URL 
+        * Currently this API call only supports self keyword
+        * The body of this request should be empty. If it is non-empty, the body will be ignored.
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: client-type-id-goes-here
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          description: LinksysUserAuth session_token="session-token-goes-here"
+          required: true
+          type: string
+        - in: path
+          name: username
+          description: Value of this path variable should be  Self .
+          required: true
+          type: string
+      responses:
+        '200':
+          description: |-
+            * Account object containing account id and account email address is returned.
+            * Elements/fields included in the response body-
+                
+                               {
+                                  "account": {
+                                    "accountId": "AA8F9FD9-532D-4D59-B397-5D94CEC6A868",
+                                    "emailAddress": "xyzpqrtest1@gmail.com"
+                                  }
+                                }
+          schema:
+            $ref: '#/definitions/Account'
+        '403':
+          description: Access Denied. If value of the path variable "username" is other than Self.
+        '404':
+          description: Account Not Found.
+  '/accounts/{username}/basicinfo':
+    get:
+      tags:
+        - accounts
+      summary: Get basic information of an account
+      description: |-
+
+        * Gets (aka reads or retrieves) the basic information (i.e. accountId, firstName, lastName, and middleName) of the specified account
+        * The <username> is a value that uniquely identifies an account
+        * To get the account of the currently logged-in user, the <username> can be replaced by self keyword in the URL 
+        * Currently this API call only supports self keyword
+        * The body of this request should be empty. If it is non-empty, the body will be ignored.
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: client-type-id-goes-here
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          description: LinksysUserAuth session_token="session-token-goes-here"
+          required: true
+          type: string
+        - in: path
+          name: username
+          description: Value of this path variable should be  Self .
+          required: true
+          type: string
+      responses:
+        '200':
+          description: |-
+            Account object containing account details of the  user are retrieved .
+            * Elements/fields included in the response body-
+            * accountId - A unique ID ((system generated) of the account. Required ? Yes
+            * firstName  - The first name of the user that the account belongs to. Required ? Yes
+            * lastName  - The last name of the user that the account belongs to. Required ? Yes
+            * middleName - The middle name of the user that the account belongs to. Required ? No
+            * Sample response body ( JSON) -
+
+
+                      {
+                          "account": {
+                            "accountId": "AA8F9FD9-532D-4D59-B397-5D94CEC6A868",
+                            "firstName": "Amrit",
+                            "lastName": "Jain",
+                            "middleName": "L"
+                          }
+                        }
+          schema:
+            $ref: '#/definitions/Account'
+        '403':
+          description: Access Denied. If value of the path variable "username" is other than Self.
+        '404':
+          description: Account Not Found.
+  '/accounts/{username}/status':
+    get:
+      tags:
+        - accounts
+      summary: Get the status of an account
+      description: |-
+
+        * Gets (aka reads or retrieves) the current status of an account. An account's status can be NONEXISTENT, PENDING, ACTIVE or DISABLED
+        * The <username> is a value that uniquely identifies an account.
+        * The body of this request should be empty. If it is non-empty, the body will be ignored.
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: client-type-id-goes-here
+          required: true
+          type: string
+        - in: path
+          name: username
+          description: username
+          required: true
+          type: string
+      responses:
+        '200':
+          description: |-
+
+            * Account object with the account status of the user is sent back .
+            * Sample response body ( json) -
+
+                     {
+                        "account": { "status": "ACTIVE" }
+                      }
+          schema:
+            $ref: '#/definitions/Account'
+  '/accounts/{username}/passwordchanges':
+    post:
+      tags:
+        - accounts
+      summary: Change password for an account
+      description: |-
+
+        * Changes password for an account. To change the password, the user must be logged-in and provide his/her current password * The <username> is a value that uniquely identifies an account.
+        * To change the password of the currently logged-in user, the <username> can be replaced by self keyword in the URL
+        * Elements/fields to be included in the request body-
+        * currentPassword - The current password of the account. Required ? YES
+        * newPassword - The new password of the account. Required ? YES
+        * sample request body (Json)-
+
+                {
+                    "passwordChange": {
+                      "currentPassword": "testpwd3",
+                      "newPassword": "testpwd4"
+                    }
+                  }
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: client-type-id-goes-here
+          required: true
+          type: string
+        - in: header
+          name: Autorization
+          description: LinksysUserAuth session_token="session-token-goes-here"
+          required: true
+          type: string
+        - in: path
+          name: username
+          description: value should be Self
+          required: true
+          type: string
+        - in: body
+          name: PasswordChange
+          description: 'PasswordChange object contains currentPassword, newPassword'
+          required: true
+          schema:
+            $ref: '#/definitions/PasswordChange'
+      responses:
+        '200':
+          description: New password is updated .Resturns empty PasswordChange object
+          schema:
+            $ref: '#/definitions/PasswordChange'
+        '400':
+          description: if password validation fails.
+        '403':
+          description: |-
+            * ACCESS_DENIED . If value of the path variable "username" is other than Self.
+            * INVALID_CURRENT_PASSWORD - The specified currentPassword does not match with the password stored in the database.
+  '/accounts/{username}/passwordresets':
+    post:
+      tags:
+        - accounts
+      summary: Reset password for an account
+      description: |-
+
+        * Resets password for an account. It sends out an email notification to the user to verify the password reset. The new password becomes effective only after it has been verified by the user. It returns an error if an account with the specified username does not exist OR the account has been DISABLED.
+        * The <username> is a value that uniquely identifies an account.
+        * The body of this request should be empty. If it is non-empty, the body will be ignored.
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: client-type-id-goes-here
+          required: true
+          type: string
+        - in: path
+          name: username
+          description: value should be Self
+          required: true
+          type: string
+        - in: query
+          name: callback
+          description: callback url
+          required: false
+          type: string
+      responses:
+        '200':
+          description: 'Empty PasswordRest object is returned. '
+          schema:
+            $ref: '#/definitions/PasswordReset'
+        '403':
+          description: ACCOUNT_DISABLED  - If account is disabled or pending .
+        '404':
+          description: ACCOUNT_NOT_FOUND  -An account with the specified username does not exist.
+  '/accounts/{username}/preferences':
+    get:
+      tags:
+        - accounts
+      summary: Get preferences of an account
+      description: |-
+        * Gets (aka reads or retrieves) preferences of a specific account.
+         
+        * The <username> is a value that uniquely identifies an account.
+        * To get the preferences of the currently logged-in user, the <username> can be replaced by self keyword in the URL 
+        * Currently this API call only supports self keyword
+        * The body of this request should be empty. If it is non-empty, the body will be ignored.
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: client-type-id-goes-here
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          description: LinksysUserAuth session_token="session-token-goes-here"
+          required: true
+          type: string
+        - in: path
+          name: username
+          description: username value should always be Self
+          required: true
+          type: string
+        - in: query
+          name: type
+          description: The type of preference for which to retrieve the values. Allowed value- NOTIFICATION . required ? No
+          required: false
+          type: string
+      responses:
+        '200':
+          description: |-
+            * Preferences object is sent back .Elements/fields included in the response body-
+            * newsletterOptIn - The newsletter opt-in (true/false) preference for the account 
+            * locale.language - One of the ISO 639 language codes 
+            * locale.country - One of the ISO_3166-1_alpha-2 country codes 
+            * notification.type - Type of the notification preferences (PUSH/SMS/EMAIL) 
+            * notification.value - Value of the notification preference (SMART DEVICE ID - if the type is PUSH)
+            * Example Response Body for query parameter type with value 'NOTIFICATION'(on Success)-
+
+
+                    {
+                      "preferences": {
+                        "notifications": {
+                          "notification": [
+                            {
+                              "type": "PUSH",
+                              "value": "1D00C219-AD69-4A28-B03A-8F1EB01B16E9"
+                            },
+                            {
+                              "type": "PUSH",
+                              "value": "2D00C219-AD69-4A28-B03A-8F1EB01B16E9"
+                            }
+                          ]
+                        }
+                      }
+                    }
+          schema:
+            $ref: '#/definitions/Preferences'
+        '403':
+          description: ACCESS_DENIED when path parameter username is not equal to 'Self'.
+    put:
+      tags:
+        - accounts
+      summary: Update preferences of an account
+      description: |-
+
+        * Updates the preferences of a specific account.
+        * The <username> is a value that uniquely identifies an account.
+        * To update the preferences of the currently logged-in user, the <username> can be replaced by self keyword in the URL.This call overrides the existing user preferences on the cloud with the preferences set in the request.
+        * Currently this API call only supports self keyword
+        * Elements/fields to be included in the request body-
+        * newsletterOptIn - The newsletter opt-in (true/false) preference for the account . Required ? No
+            
+        * locale.language - One of the ISO 639 language codes .Required ? Yes if <locale> element is included 
+        * locale.country - One of the ISO_3166-1_alpha-2 country codes . Required ? No
+        * notification.type - Type of the notification preferences (PUSH/SMS/EMAIL) . Required ? Yes if <notification> element is included
+        * notification.value - Value of the notification preference (SMART DEVICE ID - if the type is PUSH) . Required ? No
+        * Example Request Body(Json)
+
+                
+                        {   
+                        "preferences": 
+                             "locale": { 
+                                  "language": "en", 
+                                  "country": "US" 
+                               },     
+                             "notifications": {
+                              "notification": [
+                                {
+                                  "type": "PUSH",
+                                  "value": "1D00C219-AD69-4A28-B03A-8F1EB01B16E9"
+                                },
+                                {
+                                  "type": "PUSH",
+                                  "value": "2D00C219-AD69-4A28-B03A-8F1EB01B16E9"
+                                }
+                              ]
+                            }
+                         }
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: client-type-id-goes-here
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          description: LinksysUserAuth session_token="session-token-goes-here"
+          required: true
+          type: string
+        - in: path
+          name: username
+          description: username value should always be Self
+          required: true
+          type: string
+        - in: body
+          name: Preferences
+          description: Preferences Object containing the user prefernces for update
+          required: true
+          schema:
+            $ref: '#/definitions/Preferences'
+      responses:
+        '200':
+          description: |-
+
+            * updated Preferences object is sent back.
+            * Sample response body (Json)
+
+              
+                      { 
+                      "preferences": 
+                           "locale": {
+                                "language": "en", 
+                                "country": "US" 
+                             }, 
+                           "notifications": {
+                            "notification": [
+                              {
+                                "type": "PUSH",
+                                "value": "1D00C219-AD69-4A28-B03A-8F1EB01B16E9"
+                              },
+                              {
+                                "type": "PUSH",
+                                "value": "2D00C219-AD69-4A28-B03A-8F1EB01B16E9"
+                              }
+                            ]
+                          }
+                       }
+          schema:
+            $ref: '#/definitions/Preferences'
+        '403':
+          description: Access denied when path parameter username is not equal to 'Self'.
+  '/accounts/{username}/clients':
+    get:
+      tags:
+        - accounts
+      summary: Get clients authorized by an account
+      description: |-
+
+        * Gets (aka reads or retrieves) a list of clients authorized by the specified account. It should return only the basic information of each client (for example it MUST NOT return the client secret).
+        * The <username> is a value that uniquely identifies an account.
+        * For the currently logged-in user, the <username> can be replaced by self keyword in the URL
+        * Currently this API call only supports self keyword.
+        * The body of this request should be empty. If it is non-empty, the body will be ignored.
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: Linksys Client Type Id
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          description: LinksysUserAuth session_token="session-token-goes-here"
+          required: true
+          type: string
+        - in: path
+          name: username
+          description: Value of this path variable should be  Self .
+          required: true
+          type: string
+      responses:
+        '200':
+          description: |-
+            List of Clients is returned(object 'ClientTypes' containing list of objects ClientTye)
+
+            * Example Response Body (on Success)-
+
+                    {
+                        "clients": {
+                          "client": [
+                            {
+                              "clientId": "7371C99E-1399-415E-8834-26D4A5D99B7F",
+                              "friendlyName": "Amazing Parental Control App",
+                              "description": "some description goes here",
+                              "logoUrl": "http://www.amazing.com/images/pcapp.gif",
+                              "service": {
+                                "serviceId": "8881C99E-4444-ABCE-3466-26D4A5D99666",
+                                "developerCompany": {
+                                  "developerCompanyId": "7772D44A-3333-E45D-4356-1111D5B33AD3",
+                                  "name": "Amazing Inc.",
+                                  "domain": "www.amazing.com",
+                                  "logoUrl": "http://www.amazing.com/images/company-logo.gif"
+                                }
+                              },
+                              "consent": {
+                                "token": "GFJWEKGKWNWGWEGNCSDJSDVSDD235235FGSDLG",
+                                "consentedAt": "2012-04-28T21:23:08.407-07:00"
+                              },
+                              "refreshTokens": {
+                                "refreshToken": [
+                                  {
+                                    "token": "GHWGNSKDBBBJIJEUITYHRHGKHGUG545KFHK2342",
+                                    "createdAt": "2012-04-28T21:23:08.407-07:00",
+                                    "expiresAt": "2012-05-28T21:23:08.407-07:00"
+                                  },
+                                  {
+                                    "token": "46535KGHJSHGSDGUIXCI8234924HKHKDSGF843H",
+                                    "createdAt": "2011-05-26T20:15:33.407-07:00",
+                                    "expiresAt": "2011-06-26T20:15:33.407-07:00"
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "clientId": "888AB88F-4444-234D-1123-77D4A5D77AA9",
+                              "friendlyName": "Wow QOS Web App",
+                              "description": "some description goes here",
+                              "logoUrl": "http://www.wowqos.com/images/qosapp.gif",
+                              "service": {
+                                "serviceId": "9991C99E-3333-5434-3465-77D4A5D99ADE",
+                                "developerCompany": {
+                                  "developerCompanyId": "2342D4BB-2354-8765-9595-3333D5B33FFF",
+                                  "name": "Wow Qos Inc.",
+                                  "domain": "www.wowqos.com",
+                                  "logoUrl": "http://www.wowqos.com/images/company-logo.gif"
+                                }
+                              },
+                              "consent": {
+                                "token": "GHAGHAGHWE43545KGHGGH345LJFGOORQWR",
+                                "consentedAt": "2012-04-28T21:23:08.407-07:00"
+                              },
+                              "accessTokens": {
+                                "accessToken": [
+                                  {
+                                    "token": "LKJGHJKG82345945KGJJKHTHK345235KKWKJ",
+                                    "createdAt": "2012-04-28T21:23:08.407-07:00",
+                                    "expiresAt": "2012-04-28T22:23:08.407-07:00"
+                                  },
+                                  {
+                                    "token": "OIERIWSDG84355HWHGKJWHGK345543KHJHJK",
+                                    "createdAt": "2011-05-26T20:15:33.407-07:00",
+                                    "expiresAt": "2011-05-26T21:15:33.407-07:00"
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      }
+
+              
+          schema:
+            $ref: '#/definitions/ClientTypes'
+        '403':
+          description: Access Denied. If value of the path variable "username" is other than Self.
+        '404':
+          description: Account Not Found.
+  '/accounts/{username}/usernamechanges':
+    post:
+      tags:
+        - accounts
+      summary: Change username for an account
+      description: |-
+
+        * Changes username for an account. To change the username, the user must be logged-in and provide his/her current password.The status of the account will become PENDING. The status is changed to ACTIVE when the user verifies username change by clicking the link embedded in the email. A e-mail will be sent to the old account e-mail as well notifying of this change.
+        * The <username> is a value that uniquely identifies an account.
+        * To change the username of the currently logged-in user, the <username> can be replaced by self keyword in the URL 
+        * Currently this API call only supports self keyword
+        * Elements/fields to be included in the request body-
+        * currentPassword  . Required ? Yes
+        * newUsername . Required ? Yes
+        * Sample request body ( Json)-
+
+                    {
+                      "usernameChange": {
+                        "currentPassword": "testpwd3",
+                        "newUsername": "testuser@gmail.com"
+                      }
+                    }
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: Linksys Client Type Id
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          description: LinksysUserAuth session_token="session-token-goes-here"
+          required: true
+          type: string
+        - in: path
+          name: username
+          description: value should always be 'Self'
+          required: true
+          type: string
+        - in: body
+          name: UsernameChange
+          description: UsernameChange contains the currentpassword and new username of the logged in user
+          required: true
+          schema:
+            $ref: '#/definitions/UsernameChange'
+      responses:
+        '200':
+          description: Empty UsernameChange object is returned as response.
+          schema:
+            $ref: '#/definitions/UsernameChange'
+        '400':
+          description: INVALID_PARAMETER - Invalid new username. .
+        '403':
+          description: |-
+
+            * Access Denied. If value of the path variable "username" is other than Self or if the user doesnot have the right permission.
+            * INVALID_CURRENT_PASSWORD  - The specified currentPassword does not match with the password stored in the database
+            * ACCOUNT_PENDING 
+            * ACCOUNT_DISABLED 
+        '409':
+          description: ACCOUNT_ALREADY_EXISTS  - An account with the specified username already exists.
+  /accountdeletion:
+    post:
+      tags:
+        - accounts
+      summary: Delete an account
+      description: |-
+
+        * It deletes the specified account and all the associated information.
+        * It performs the following tasks in the order specified below after successfully validating the account credentials:
+              •Invoke the appropriate JNAP action(s) to remove / clear the network credentials (network id and password) stored in the routers owned by the specified account.
+              •Invoke the appropriate CGI calls to remove / clear the camera ownership credentials (ownership id and ownership secret) stored in the IP cameras owned by the specified account.
+              •Delete all the information about the routers / networks and the IP cameras owned by the specified account from the XMPP servers.
+              •Delete all the information about the specified account from the home support system.
+              •Delete the specified account and all the associated information from the HNBU database(s).
+              •Send out an email to the user confirming that the account has been deleted.
+
+        * NOTE- To block bots and other entities from breaking user passwords, this API call may return a CAPTCHA_REQUIRED error. To handle this error, the client application must display the CAPTCHA challenge UI and solicit an answer from the user. See CAPTCHA section for details.
+        * Elements/fields to be included in the request body-
+        * account -> username - The globally unique username of the account to be deleted . required ? Yes
+        * account -> password - The password of the account to deleted. Required ? Yes
+        * sample request body (Json) -
+
+                  {
+                        "account": {
+                          "username": "amritjaintest1@gmail.com",
+                          "password": "test333"
+                        }
+                      }
+                  
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: Linksys Client Type Id
+          required: true
+          type: string
+        - in: body
+          name: Account
+          description: Account object with account username & password in it
+          required: true
+          schema:
+            $ref: '#/definitions/Account'
+      responses:
+        '200':
+          description: |-
+
+            * Account object with username is returned as response.
+            * Sample response body -
+
+                            {
+                              "account": { "username": "amritjaintest1@gmail.com" }
+                            }
+          schema:
+            $ref: '#/definitions/Account'
+        '400':
+          description: CAPTCHA_REQUIRED   .
+        '403':
+          description: |-
+
+            * ACCOUNT_DISABLED - The account has been disabled. 
+            * ACCOUNT_PENDING - The account creation is PENDING.  In other words, the user has not verified the account creation by clicking the link embedded in the account creation email
+            * INVALID_ACCOUNT_CREDENTIALS - It's returned if any of the following conditions is true. •An account with the specified username does not exist.•The account credentials (username/password) specified in the request is wrong.
+            * CAPTCHA_INCORRECT - The specified CAPTCHA challege-token and/or response-string are incorrect. 
+            * ACCOUNT_LOCKED_OUT  - Account has been locked. 
+            * Additional parameters will be sent along with Error code ACCOUNT_LOCKED_OUT to specify the lock out time (in minutes). Following is sample response that contains error code ACCOUNT_LOCKED_OUT.
+
+                         {
+                        "errors": {
+                          "error": {
+                            "code": "ACCOUNT_LOCKED_OUT",
+                            "message": "Account has been locked.",
+                            "parameters": {
+                              "name": "ACCOUNT_LOCKOUT_TIME",
+                              "value": "120"
+                            }
+                          }
+                        }
+                      }
+  /accountfilter:
+    post:
+      tags:
+        - accounts
+      summary: Get a list of accounts
+      description: |-
+
+        * Gets a list of accounts based on the specified filter criteria. This API will be invoked by our internal clients (support site, review service, etc.) and would require that the client has special privilege to perform this operation (the client authentication and privilege/role needed will be further defined later).
+        * Elements/fields to be included in the request body-
+        * accountIds - A list of the accountId(s). Required ? No
+        * accountId  - The accountId of the account to be retrieved.  Required ? Yes- if the accountIds element is included 
+        * Example Request Body-
+                       {
+                          "accountFilter": {
+                            "accountIds": {
+                              "accountId": [
+                                "22095B4D-2C97-4BF2-AF61-ACEFB4904535",
+                                "46B0C97E-E8AB-4259-A299-16A3B974D6F0"
+                              ]
+                            }
+                          }
+                        }
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: Linksys Client Type Id
+          required: true
+          type: string
+        - in: body
+          name: AccountFilter
+          description: AccountFilter contains list of accountIds
+          required: true
+          schema:
+            $ref: '#/definitions/AccountFilter'
+      responses:
+        '200':
+          description: |-
+
+            * AccountList object is returned as response.Max accounts retrieved is 30.
+            * If the value of alias field is empty (in the backend database) for the account being returned, this API call returns the "firstName followed by lastName initial" as the value of alias field. Returns the actual value of alias field otherwise.
+            * Example Response Body (on Success)-
+
+                      {
+                            "accountList": {
+                              "paginationResult": {
+                                "startIndex": "0",
+                                "itemsReturned": "2",
+                                "totalItems": "2"
+                              },
+                              "accounts": {
+                                "account": [
+                                  {
+                                    "accountId": "22095B4D-2C97-4BF2-AF61-ACEFB4904535",
+                                    "username": "amritjaintest1@gmail.com",
+                                    "firstName": "Amrit",
+                                    "lastName": "Jain",
+                                    "middleName": "L",
+                                    "alias": "amritj"
+                                  },
+                                  {
+                                    "accountId": "46B0C97E-E8AB-4259-A299-16A3B974D6F0",
+                                    "username": "danielku@gmail.com",
+                                    "firstName": "Daniel",
+                                    "lastName": "Ku",
+                                    "middleName": "L",
+                                    "alias": "Daniel K"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+          schema:
+            $ref: '#/definitions/AccountList'
+  /sessions:
+    post:
+      tags:
+        - sessions
+      summary: Create a session (Log-in)
+      description: |-
+
+        * It creates a session by authenticating the account.
+        * Elements/fields to be included in the request body-
+        * account -> username - The globally unique username of the account. Required ? Yes
+        * account -> password - The password of the account.  Required ? Yes
+        * requestedTimeToLive - The requested time-to-live in seconds. The amount of time the session (session token) should be valid.  The server may decide to not honor this and enforce its own logic/algorithm to determine how long the  session(session token) will be valid.  Required ? No
+        * passwordEncrypted - Indicates if the password has already been encrypted by the client. Defaults to false. Required ? No
+        * Sample request body (JSON)-
+                
+                    {
+                    "session": {
+                      "account": {
+                        "username": "amritjaintest1@gmail.com",
+                        "password": "test333"
+                      }
+                    }
+                  }
+                  
+                  
+            // Request body with password encrypted
+            
+                  {
+                      "session": {
+                        "account": {
+                          "username": "amritjaintest1@gmail.com",
+                          "password": "u5WZLZ4+1ROGjJWPo/n0cP+2WS593aHUmdyXC2ysQFM="
+                        },
+                        "passwordEncrypted": "true"
+                      }
+                    }
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: Linksys Client Type Id
+          required: true
+          type: string
+        - in: body
+          name: Session
+          description: Session object with account username and password in it
+          required: true
+          schema:
+            $ref: '#/definitions/Session'
+      responses:
+        '200':
+          description: |-
+
+            * Session object with session token  is returned as response.
+            * Sample response body (JSON)
+
+                     {
+                       "session": {
+                             "token": "4A7343BE34134834AA58E929484F4BEF4A7343BE34134834AA58E929484F4BEF"
+                       }
+                    }
+          schema:
+            $ref: '#/definitions/Session'
+        '403':
+          description: |-
+
+            * ACCOUNT_DISABLED / ACCOUNT_LOCKED_OUT 
+            * INVALID_ACCOUNT_CREDENTIALS  - It's returned if any of the following conditions is true. •An account with the specified username does not exist.•The account credentials (username/password) specified in the request is wrong.
+            * ACCOUNT_PENDING  - The account creation is PENDING. In other words, the user has not verified the account creation by clicking the link embedded in the account creation email.
+            * Additional parameters will be sent along with Error code ACCOUNT_LOCKED_OUT to specify the lock out time (in minutes). Following is sample response that contains error code ACCOUNT_LOCKED_OUT.
+                
+                 {
+                      "errors": {
+                        "error": {
+                          "code": "ACCOUNT_LOCKED_OUT",
+                          "message": "Account has been locked.",
+                          "parameters": {
+                            "parameter": {
+                              "name": "ACCOUNT_LOCKOUT_TIME",
+                              "value": "120"
+                            }
+                          }
+                        }
+                      }
+                    }
+  '/sessions/{sessionToken}':
+    delete:
+      tags:
+        - sessions
+      summary: Exit a session (Log-out)
+      description: |-
+
+        * Exits / Deletes a session with the specified token. A session (token) cannot be used by the client after it's exited / deleted using this API call.
+        * The <sessionToken> is a value that uniquely identifies a session.
+        * The body of this request should be empty. If it is non-empty, the body will be ignored.
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: Linksys Client Type Id
+          required: true
+          type: string
+        - in: path
+          name: sessionToken
+          description: sessionToken
+          required: true
+          type: string
+      responses:
+        '200':
+          description: |-
+
+            * Session object with session token  is returned as response.
+
+                     {
+                       "session": { "token": "4A7343BE34134834AA58E929484F4BEF4A7343BE34134834AA58E929484F4BEF" }
+                     }
+          schema:
+            $ref: '#/definitions/Session'
+        '404':
+          description: SESSION_NOT_FOUND - The session with the specified token is not found
+  /verifications:
+    post:
+      tags:
+        - verifications
+      summary: Create a verification
+      description: |-
+
+        * It creates a verification of the specified type.
+        * Note 1- It currently supports creating a verification of type ACCOUNT_CREATION only. A verification of type ACCOUNT_CREATION can be created for an account only if the current status of the account is PENDING. After creating the verification record, it sends out an email to the user to verify the account creation.
+        * type  - The type of verification to be created. Valid value is ACCOUNT_CREATION. Required ? yes
+        * parameters - A list of parameters (key/value pairs).  The parameters needed depend on the type of the verification being created.  For ACCOUNT_CREATION, a parameter named username needs to be supplied. The value of the username parameter should be the email of the account being verified. Required ? Yes (for ACCOUNT_CREATION)  
+        * Example request body ( JSON ) -
+
+                   {
+                        "verification": {
+                          "type": "ACCOUNT_CREATION",
+                          "parameters": {
+                            "parameter": {
+                              "name": "username",
+                              "value": "amritjaintest1@gmail.com"
+                            }
+                          }
+                        }
+                      }
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: Linksys Client Type Id
+          required: true
+          type: string
+        - in: body
+          name: Verification
+          description: Verification object "username" as one of the parameters(parameters list inside Verification object)
+          required: true
+          schema:
+            $ref: '#/definitions/Verification'
+      responses:
+        '200':
+          description: Empty Verification object is returned as response.
+          schema:
+            $ref: '#/definitions/Verification'
+        '404':
+          description: 'VERIFICATION_TARGET_NOT_FOUND - A verification is created for verifying something. This error code is returned if that something does nor exist.  For example, verification of type ACCOUNT_CREATION will not be created if the account being verified does not exist.'
+        '409':
+          description: 'ALREADY_VERIFIED - A verification is created for verifying something. This error code is returned if that something has already been verified.  For example, verification of type ACCOUNT_CREATION will not be created if the account has already been verified (i.e. the status of the account is not PENDING). '
+  '/verifications/{verificationToken}/status':
+    put:
+      tags:
+        - verifications
+      summary: Update the status of a verification
+      description: |-
+
+        * It updates a verification's status to ACCEPTED or REJECTED. It's used for verifying the Account Creation, Password Reset, etc.
+        * During Account Creation or Password Reset process, the cloud server creates a verification record and sends out an email to the user to verify the operation being performed. The email contains a link which takes the user to a landing page where the user can either accept or reject the verification. The landing page makes this API call to update the status of the verification as ACCEPTED or REJECTED.
+        * The <verificationToken> is a value that uniquely identifies a verification.
+        * Elements/fields to be included in the request body-
+        * status - The status of the verification - ACCEPTED or REJECTED. required  ? Yes
+        * parameters  - Holds a list of parameters with name and value . Required ? No
+        * Sample request body ( JSON) -
+                  {
+                      "verification": {
+                        "status": "ACCEPTED",
+                        "parameters": {
+                          "parameter": {
+                            "name": "password",
+                            "value": "password123"
+                          }
+                        }
+                      }
+                    }
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: Linksys Client Type Id
+          required: true
+          type: string
+        - in: path
+          name: verificationToken
+          description: verificationToken
+          required: true
+          type: string
+        - in: body
+          name: Verification
+          description: Verification object
+          required: true
+          schema:
+            $ref: '#/definitions/Verification'
+      responses:
+        '200':
+          description: |-
+
+            * Verification object with token and status is returned as response.
+            * Sample response body (Json)-
+
+                    {
+                      "verification": {
+                        "token": "gsghkggjlglkdsjgldsjkglmsdjgg9574957fkgsgj",
+                        "status": "ACCEPTED"
+                      }
+                    }
+          schema:
+            $ref: '#/definitions/Verification'
+        '404':
+          description: VERIFICATION_NOT_FOUND - A verification with the specified token does not exist.
+        '409':
+          description: VERIFICATION_STATUS_ALREADY_UPDATED  - The status of the specified verification has already been updated as ACCEPTED or REJECTED.
+  '/clients/{client_id}/basicinfo':
+    get:
+      tags:
+        - clients
+      summary: Get basic information of a client
+      description: 'Gets the basic information of the specified client.The <clientId> is a value that uniquely identifies a client whose basic information is to be retrieved.The body of this request should be empty. If it is non-empty, the body will be ignored.'
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: Linksys Client Type Id
+          required: true
+          type: string
+        - in: header
+          name: Autorization
+          description: LinksysUserAuth session_token="session-token-goes-here"
+          required: true
+          type: string
+        - in: path
+          name: client_id
+          description: client_id
+          required: true
+          type: string
+      responses:
+        '200':
+          description: |-
+
+
+            * ClientType object with information ablout the client is returned .
+            * Sample response body (JSON) -
+
+                     {
+                        "client": {
+                          "clientId": "7371C99E-1399-415E-8834-26D4A5D99B7F",
+                          "friendlyName": "Amazing Parental Control App",
+                          "description": "some description goes here",
+                          "logoUrl": "http://www.amazing.com/images/pcapp.gif",
+                          "service": {
+                            "serviceId": "8881C99E-4444-ABCE-3466-26D4A5D99666",
+                            "developerCompany": {
+                              "developerCompanyId": "7772D44A-3333-E45D-4356-1111D5B33AD3",
+                              "name": "Amazing Inc.",
+                              "domain": "www.amazing.com",
+                              "logoUrl": "http://www.amazing.com/images/company-logo.gif"
+                            }
+                          }
+                        }
+                      }
+          schema:
+            $ref: '#/definitions/ClientType'
+        '404':
+          description: CLIENT_NOT_FOUND or  INVALID_CLIENT_TYPE
+  '/clients/{client_id}/apigroups':
+    get:
+      tags:
+        - clients
+      summary: Get API groups assigned to a client
+      description: 'Gets a list of API groups (and API methods within each group) assigned to the specified client.The <clientId> is a value that uniquely identifies a client.The body of this request should be empty. If it is non-empty, the body will be ignored.'
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: Linksys Client Type Id
+          required: true
+          type: string
+        - in: header
+          name: Authorization
+          description: LinksysUserAuth session_token="session-token-goes-here"
+          required: true
+          type: string
+        - in: path
+          name: client_id
+          description: client_id
+          required: true
+          type: string
+      responses:
+        '200':
+          description: |-
+
+            * Returns 200 if the API groups (and API methods within each group) assigned to the specified client are retrieved successfully
+            * Sample response body (JSON) - 
+
+                    {
+                      "apiGroups": {
+                        "apiGroup": {
+                          "apiGroupId": "PARENTAL-CONTROL",
+                          "friendlyName": "Parental Control",
+                          "authorizationMsg": "Manages parental control settings for your router(s)",
+                          "sequence": "2",
+                          "apiMethods": {
+                            "apiMethod": [
+                              {
+                                "apiMethodId": "GET-PARENTAL-CONTROL-SETTINGS",
+                                "type": "ROUTER_JNAP",
+                                "friendlyName": "Get Parental Control Settings",
+                                "authorizationMsg": "Reads parental control settings for your router(s)",
+                                "sequence": "1"
+                              },
+                              {
+                                "apiMethodId": "SET-PARENTAL-CONTROL-SETTINGS",
+                                "type": "ROUTER_JNAP",
+                                "friendlyName": "Set Parental Control Settings",
+                                "authorizationMsg": "Modifies parental control settings for your router(s)",
+                                "sequence": "2"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+          schema:
+            $ref: '#/definitions/ApiGroups'
+        '404':
+          description: CLIENT_NOT_FOUND .
+  /apimethodauthcheck:
+    post:
+      tags:
+        - ApiMethodAuthorizationCheck
+      summary: Check API Method authorization
+      description: |-
+
+        * It checks if the specified client and/or the account are authorized to invoke the specified API Method.
+        * Elements/fields to be included in the request body-
+        * clientId  - The unique id of the end client which is invoking the API Method. . Required ? YEs
+        * accessToken  - The access token (aka session token) supplied by the end client while invoking the specified API Method.. Required ? No
+        * apiMethodId  - The unique id of the API Method whose authorization is to be checked. In other words, the unique id of the API Method being invoked by the end client. Required ? Yes
+        * sample request body (JSON)-
+
+                 {
+                  "apiMethodAuthorizationCheck": {
+                    "clientId": "7371C99E-1399-415E-8834-26D4A5D99B7F",
+                    "accessToken": "GHWGNSKDBBBJIJEUITYHRHGKHGUG545KFHK2342",
+                    "apiMethodId": "GET-PARENTAL-CONTROL-SETTINGS"
+                  }
+                }
+      consumes:
+        - application/json
+        - application/xml
+      produces:
+        - application/json
+        - application/xml
+      parameters:
+        - in: header
+          name: X-Linksys-Client-Type-Id
+          description: Linksys Client Type Id
+          required: true
+          type: string
+        - in: body
+          name: ApiMethodAuthorizationCheck
+          description: 'ApiMethodAuthorizationCheck object with clientId, accesstoken, apiMethodId should be passed'
+          required: true
+          schema:
+            $ref: '#/definitions/ApiMethodAuthorizationCheck'
+      responses:
+        '200':
+          description: |-
+            * Returns 200 if the specified client and/or the account are authorized to invoke the specified API Method
+                  
+                * Example Response Body (on Success)-
+                
+                         {
+                              "apiMethodAuthorizationCheck": {
+                                "account": {
+                                  "accountId": "AA8F9FD9-532D-4D59-B397-5D94CEC6A868",
+                                  "username": "amritjaintest1@gmail.com",
+                                  "firstName": "Amrit",
+                                  "lastName": "Jain",
+                                  "middleName": "L"
+                                },
+                                "client": {
+                                  "clientId": "7371C99E-1399-415E-8834-26D4A5D99B7F",
+                                  "friendlyName": "Amazing Parental Control App"
+                                }
+                              }
+                            }
+          schema:
+            $ref: '#/definitions/ApiMethodAuthorizationCheck'
+        '401':
+          description: 'INVALID_SESSION_TOKEN   - The specified session/access token is not valid or has expired. '
+        '403':
+          description: INVALID_CLIENT_TYPE - A client with the specified clientId is not found or active.  ACCESS_DENIED - The specified client and/or the account are NOT authorized to invoke the specified API Method
+securityDefinitions:
+  LinksysUserAuth:
+    type: apiKey
+    name: session_token
+    in: header
+definitions:
+  Account:
+    type: object
+    properties:
+      accountId:
+        type: string
+      username:
+        type: string
+      emailAddress:
+        type: string
+      password:
+        type: string
+      firstName:
+        type: string
+      middleName:
+        type: string
+      lastName:
+        type: string
+      cdnUsername:
+        type: string
+      alias:
+        type: string
+      status:
+        type: string
+      gender:
+        type: string
+      preferences:
+        $ref: '#/definitions/Preferences'
+  PasswordChange:
+    type: object
+    properties:
+      currentPassword:
+        type: string
+      newpassword:
+        type: string
+      createdAt:
+        type: string
+      modifiedAt:
+        type: string
+  PasswordReset:
+    type: object
+    properties:
+      password:
+        type: string
+      createdAt:
+        type: string
+      modifiedAt:
+        type: string
+  Locale:
+    type: object
+    properties:
+      language:
+        type: string
+      localeid:
+        type: string
+      country:
+        type: string
+      friendlyname:
+        type: string
+  Notification:
+    type: object
+    properties:
+      notificationId:
+        type: string
+      type:
+        type: string
+      value:
+        type: string
+      status:
+        type: string
+  Notifications:
+    type: object
+    properties:
+      notification:
+        type: array
+        items:
+          $ref: '#/definitions/Notification'
+  Preferences:
+    type: object
+    properties:
+      newsletterOptIn:
+        type: string
+      locale:
+        $ref: '#/definitions/Locale'
+      notifications:
+        $ref: '#/definitions/Notifications'
+  ClientScreenshot:
+    type: object
+    properties:
+      clientScreenshotId:
+        type: string
+      uploadItemId:
+        type: string
+      order:
+        type: string
+      url:
+        type: string
+  Platform:
+    type: object
+    properties:
+      platformId:
+        type: string
+      os:
+        type: string
+      osFriendlyName:
+        type: string
+      deviceType:
+        type: string
+      deviceTypeFriendlyName:
+        type: string
+  Category:
+    type: object
+    properties:
+      categoryId:
+        type: string
+      name:
+        type: string
+      description:
+        type: string
+  ClientDeviceCompatibility:
+    type: object
+    properties:
+      deviceModelNumber:
+        type: string
+      minHardwareVersion:
+        type: string
+      minFirmwareVersion:
+        type: string
+  RefreshToken:
+    type: object
+    properties:
+      token:
+        type: string
+      createdAt:
+        type: string
+  RedirectUri:
+    type: object
+    properties:
+      uri:
+        type: string
+  Session:
+    type: object
+    properties:
+      account:
+        $ref: '#/definitions/Account'
+      requestedTimeToLive:
+        type: integer
+      passwordEncrypted:
+        type: string
+      token:
+        type: string
+  ClientType:
+    type: object
+    properties:
+      clientId:
+        type: string
+      friendlyName:
+        type: string
+      description:
+        type: string
+      status:
+        type: string
+      logoUrl:
+        type: string
+      service:
+        type: string
+      consent:
+        type: string
+      expirationTime:
+        type: string
+      clientSecret:
+        type: string
+      clientFamilyType:
+        type: string
+      clientProfileType:
+        type: string
+      refreshTokenSupported:
+        type: string
+      implicitGrantSupported:
+        type: string
+      authCodeGrantSupported:
+        type: string
+      internal:
+        type: string
+      apiMethodCheckRequired:
+        type: string
+      accountConsentType:
+        type: string
+      containerClient:
+        type: string
+      containerAccessTokenAllowed:
+        type: string
+      publishStatus:
+        type: string
+      lastReleasedAt:
+        type: string
+      price:
+        type: string
+      rating:
+        type: string
+      downloadUrl:
+        type: string
+      size:
+        type: string
+      version:
+        type: string
+      notificationCallbackUrl:
+        type: string
+      clientScreenshots:
+        type: array
+        items:
+          $ref: '#/definitions/ClientScreenshot'
+      platforms:
+        type: array
+        items:
+          $ref: '#/definitions/Platform'
+      categories:
+        type: array
+        items:
+          $ref: '#/definitions/Category'
+      clientDeviceCompatibilities:
+        type: array
+        items:
+          $ref: '#/definitions/ClientDeviceCompatibility'
+      locales:
+        type: array
+        items:
+          $ref: '#/definitions/Locale'
+      refreshTokens:
+        type: array
+        items:
+          $ref: '#/definitions/RefreshToken'
+      redirectUris:
+        type: array
+        items:
+          $ref: '#/definitions/RedirectUri'
+      accessTokens:
+        type: array
+        items:
+          $ref: '#/definitions/Session'
+  ClientTypes:
+    type: object
+    properties:
+      clientTypes:
+        type: array
+        items:
+          $ref: '#/definitions/ClientType'
+  AccountFilter:
+    type: object
+    properties:
+      accountIds:
+        type: array
+        items:
+          type: string
+  AccountList:
+    type: object
+    properties:
+      accounts:
+        type: array
+        items:
+          $ref: '#/definitions/Account'
+  UsernameChange:
+    type: object
+    properties:
+      currentPassword:
+        type: string
+      newUsername:
+        type: string
+  Verification:
+    type: object
+    properties:
+      token:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+      parameters:
+        type: array
+        items:
+          $ref: '#/definitions/Parameter'
+  Parameter:
+    type: object
+    properties:
+      name:
+        type: string
+      value:
+        type: string
+  ApiMethod:
+    type: object
+    properties:
+      apiMethodId:
+        type: string
+      friendlyName:
+        type: string
+      description:
+        type: string
+      type:
+        type: string
+      authorizationMsg:
+        type: string
+      sequence:
+        type: integer
+  ApiGroup:
+    type: object
+    properties:
+      apiGroupId:
+        type: string
+      friendlyName:
+        type: string
+      description:
+        type: string
+      type:
+        type: string
+      authorizationMsg:
+        type: string
+      sequence:
+        type: integer
+      apiMethods:
+        type: array
+        items:
+          $ref: '#/definitions/ApiMethod'
+  ApiGroups:
+    type: object
+    properties:
+      apiGroups:
+        type: array
+        items:
+          $ref: '#/definitions/ApiGroup'
+  ApiMethodAuthorizationCheck:
+    type: object
+    properties:
+      clientId:
+        type: string
+      accessToken:
+        type: string
+      apiMethodId:
+        type: string
+      checkSessionToken:
+        type: boolean
+      account:
+        $ref: '#/definitions/Account'
+      client:
+        $ref: '#/definitions/ClientType'
