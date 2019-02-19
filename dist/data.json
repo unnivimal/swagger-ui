@@ -1,0 +1,56 @@
+{
+   "swagger":"2.0",
+   "info":{
+      "description":"Push Notification Service",
+      "version":"1.0.0",
+      "title":"Belkin Cloud Services",
+      "contact":{
+         "name":"Surya Yadavalli",
+         "url":"http://www.linksyssmartwifi.com/",
+         "email":"surya.yadavalli@belkin.com"
+      },
+      "license":{
+         "name":"Belkin International Inc."
+      }
+   },
+   "host":"localhost:8080",
+   "basePath":"/",
+   "tags":[
+      {
+         "name":"demo-controller",
+         "description":"Demo Controller"
+      }
+   ],
+   "paths":{
+      "/demo/test/v1":{
+         "get":{
+            "tags":[
+               "demo-controller"
+            ],
+            "summary":"Update Customer-APP",
+            "operationId":"getApiDocUsingGET",
+            "consumes":[
+               "application/json"
+            ],
+            "produces":[
+               "application/json",
+               "*/*"
+            ],
+            "responses":{
+               "200":{
+                  "description":"OK",
+                  "schema":{
+                     "type":"string"
+                  }
+               },
+               "400":{
+                  "description":"Bad Request"
+               },
+               "404":{
+                  "description":"Customer Application not found"
+               }
+            }
+         }
+      }
+   }
+}
